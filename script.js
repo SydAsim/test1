@@ -6,12 +6,30 @@ function init() {
     handleSearch();
 }
 
+<<<<<<< HEAD
 // 1. Reflected XSS
+=======
+// ==========================================
+// VULNERABILITY 1: Reflected XSS
+// ==========================================
+>>>>>>> a44394d079eb60d379d13ad66252e8f095a75028
 function handleSearch() {
     const urlParams = new URLSearchParams(window.location.search);
     const query = urlParams.get('q');
     if (query) {
+<<<<<<< HEAD
         document.getElementById('searchResults').innerHTML = `Searching for: <strong>${query}</strong> <br>No results found.`;
+=======
+        const resultsDiv = document.getElementById('searchResults');
+        const escapeHTML = (str) => str.replace(/[&<>'"]/g, tag => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            "'": '&#39;',
+            '"': '&quot;'
+        }[tag]));
+        resultsDiv.innerHTML = `Searching for: <strong>${escapeHTML(query)}</strong> <br>No results found.`;
+>>>>>>> a44394d079eb60d379d13ad66252e8f095a75028
     }
 }
 
@@ -19,12 +37,32 @@ function handleSearch() {
 function renderNotes() {
     const container = document.getElementById('notesContainer');
     container.innerHTML = '';
+<<<<<<< HEAD
     notes.forEach((note, index) => {
         const noteDiv = document.createElement('div');
         noteDiv.className = 'note';
         noteDiv.innerHTML = `
             <h4>${note.title}</h4>
             <div class="content">${note.content}</div>
+=======
+    
+    const escapeHTML = (str) => String(str).replace(/[&<>'"]/g, tag => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        "'": '&#39;',
+        '"': '&quot;'
+    }[tag]));
+
+    notes.forEach((note, index) => {
+        const noteDiv = document.createElement('div');
+        noteDiv.className = 'note';
+        
+        noteDiv.innerHTML = `
+            <h4>${escapeHTML(note.title)}</h4>
+            <div class="meta">By: ${escapeHTML(note.author)}</div>
+            <div class="content">${escapeHTML(note.content)}</div>
+>>>>>>> a44394d079eb60d379d13ad66252e8f095a75028
             <button class="delete-btn" onclick="deleteNote(${index})">Delete</button>
         `;
         container.appendChild(noteDiv);
@@ -49,6 +87,7 @@ function deleteNote(index) {
     renderNotes();
 }
 
+<<<<<<< HEAD
 // 3. Broken Access Control
 function loginAdmin() {
     if (document.getElementById('adminPassword').value === "supersecret2026") {
@@ -56,6 +95,36 @@ function loginAdmin() {
         alert("Welcome Admin. Panel Unlocked.");
     } else {
         alert("Incorrect Admin Password!");
+=======
+// ==========================================
+// VULNERABILITY 3: Broken Access Control (Client-Side Auth)
+// ==========================================
+// Admin check is fully visible in JS. Any user can view the source, 
+// find the password, or just run the JS to reveal the panel!
+async function loginAdmin() {
+    const password = document.getElementById('adminPassword').value;
+    
+    try {
+        const response = await fetch('/api/admin/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ password })
+        });
+        
+        if (response.ok) {
+            const adminPanelContent = await response.text();
+            const adminPanel = document.getElementById('adminPanel');
+            adminPanel.innerHTML = adminPanelContent;
+            adminPanel.style.display = 'block';
+            alert("Welcome Admin. Panel Unlocked.");
+        } else {
+            alert("Incorrect Admin Password!");
+        }
+    } catch (error) {
+        alert("Error connecting to server.");
+>>>>>>> a44394d079eb60d379d13ad66252e8f095a75028
     }
 }
 
@@ -69,15 +138,42 @@ function clearAllData() {
 // 4. eval() XSS
 function calculate() {
     try {
+<<<<<<< HEAD
         document.getElementById('mathResult').innerText = eval(document.getElementById('mathInput').value);
+=======
+        if (!/^[0-9+\-*/().\s]+$/.test(input)) {
+            throw new Error('Invalid characters in math expression');
+        }
+        const result = Function('"use strict";return (' + input + ')')();
+        document.getElementById('mathResult').innerText = result;
+>>>>>>> a44394d079eb60d379d13ad66252e8f095a75028
     } catch (e) {
         document.getElementById('mathResult').innerText = 'Error';
     }
 }
 
+<<<<<<< HEAD
 // 5. Open Redirect
 function redirectToUrl() {
     window.location.href = document.getElementById('redirectUrl').value;
+=======
+// ==========================================
+// VULNERABILITY 5: Open Redirect
+// ==========================================
+// Fixed: Validates that the parsed URL has the same origin as the current site to prevent external redirection.
+function redirectToUrl() {
+    const url = document.getElementById('redirectUrl').value;
+    try {
+        const parsedUrl = new URL(url, window.location.origin);
+        if (parsedUrl.origin === window.location.origin) {
+            window.location.href = parsedUrl.href;
+        } else {
+            alert("External redirects are not allowed.");
+        }
+    } catch (e) {
+        alert("Invalid URL provided.");
+    }
+>>>>>>> a44394d079eb60d379d13ad66252e8f095a75028
 }
 
 // ==========================================
@@ -96,6 +192,7 @@ function merge(target, source) {
     return target;
 }
 
+<<<<<<< HEAD
 function importSettings() {
     const input = document.getElementById('jsonConfig').value;
     try {
@@ -116,6 +213,22 @@ function importSettings() {
         }
     } catch (e) {
         alert("Invalid JSON format!");
+=======
+function renderProfile() {
+    const nameDisplay = document.getElementById('usernameDisplay');
+    const imgDisplay = document.getElementById('avatarImg');
+    
+    nameDisplay.textContent = userProfile.username;
+    if (userProfile.avatar) {
+        try {
+            const parsedUrl = new URL(userProfile.avatar, window.location.origin);
+            if (['http:', 'https:', 'data:'].includes(parsedUrl.protocol)) {
+                imgDisplay.setAttribute('src', userProfile.avatar);
+            }
+        } catch (e) {
+            // Invalid URL
+        }
+>>>>>>> a44394d079eb60d379d13ad66252e8f095a75028
     }
 }
 
