@@ -8,11 +8,15 @@ function renderNotes() {
         const noteDiv = document.createElement('div');
         noteDiv.className = 'note';
         
-        // VULNERABILITY: Cross-Site Scripting (XSS)
-        // User input is directly rendered into the DOM as HTML without sanitization.
-        // A malicious user can input <img src=x onerror=alert('Hacked')>
+        const sanitizedNote = notes[i]
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+
         noteDiv.innerHTML = `
-            <div>${notes[i]}</div>
+            <div>${sanitizedNote}</div>
             <button class="delete-btn" onclick="deleteNote()">Delete</button>
         `;
         
