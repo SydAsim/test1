@@ -9,6 +9,8 @@
     --danger: #ef4444;
     --danger-hover: #dc2626;
     --card-bg: #ffffff;
+    --warning-bg: #fffbeb;
+    --warning-border: #f59e0b;
 }
 
 body {
@@ -20,13 +22,14 @@ body {
 }
 
 .navbar {
-    background-color: var(--nav-bg);
-    color: white;
+    background-color: #000;
+    color: #ef4444;
     padding: 15px 30px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border-bottom: 2px solid #ef4444;
 }
 
 .navbar h2 {
@@ -76,6 +79,20 @@ body {
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.danger-zone {
+    background-color: var(--warning-bg);
+    border: 2px solid var(--warning-border);
+}
+.danger-zone h3 {
+    color: #b45309;
+}
+.danger-zone button {
+    background-color: var(--warning-border);
+}
+.danger-zone button:hover {
+    background-color: #d97706;
 }
 
 .admin-panel {

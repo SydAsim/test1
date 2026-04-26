@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vulnerable Dashboard App</title>
+    <title>Extremely Vulnerable Dashboard</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <nav class="navbar">
-        <h2>Vulnerable Dashboard</h2>
+        <h2>☠️ Extremely Vulnerable Dashboard</h2>
         <div class="user-profile">
             <img id="avatarImg" src="default-avatar.png" alt="Avatar" onerror="this.src='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='">
             <span id="usernameDisplay">Guest</span>
@@ -20,7 +20,7 @@
         <aside class="sidebar">
             <div class="widget">
                 <h3>Search Notes</h3>
-                <!-- VULNERABILITY: Reflected XSS if search query is in URL -->
+                <!-- VULNERABILITY 1: Reflected XSS -->
                 <form action="" method="GET">
                     <input type="text" name="q" placeholder="Search..." id="searchInput">
                     <button type="submit">Go</button>
@@ -29,8 +29,8 @@
             </div>
 
             <div class="widget">
-                <h3>Quick Math Calculator</h3>
-                <!-- VULNERABILITY: eval() execution -->
+                <h3>Quick Math</h3>
+                <!-- VULNERABILITY 4: eval() execution -->
                 <input type="text" id="mathInput" placeholder="e.g., 5 + 10 or alert(1)">
                 <button onclick="calculate()">Calculate</button>
                 <p>Result: <span id="mathResult" style="color:red; font-weight:bold;">0</span></p>
@@ -38,16 +38,22 @@
 
             <div class="widget">
                 <h3>Quick Links</h3>
-                <!-- VULNERABILITY: Open Redirect -->
+                <!-- VULNERABILITY 5: Open Redirect -->
                 <input type="text" id="redirectUrl" placeholder="Enter URL to visit">
                 <button onclick="redirectToUrl()">Go Visit</button>
             </div>
             
             <div class="widget admin-widget">
                 <h3>Admin Login</h3>
-                <!-- VULNERABILITY: Client-side access control -->
+                <!-- VULNERABILITY 3: Client-side access control -->
                 <input type="password" id="adminPassword" placeholder="Admin Password">
                 <button onclick="loginAdmin()">Login</button>
+            </div>
+            
+            <div class="widget danger-zone">
+                <h3>⚠️ Malware Simulator</h3>
+                <p>Simulate what an attacker does after they get XSS:</p>
+                <button onclick="runSimulatedMalware()" style="background: #8b0000;">Inject Keylogger & Steal Data</button>
             </div>
         </aside>
 
@@ -56,20 +62,37 @@
             <!-- Hidden Admin Panel -->
             <div id="adminPanel" class="admin-panel" style="display: none;">
                 <h2>⚠️ SUPER SECRET ADMIN PANEL ⚠️</h2>
-                <p>Welcome, Administrator. You have full access.</p>
+                <p>Welcome, Administrator. You have full system access.</p>
                 <button onclick="clearAllData()">Wipe All System Data</button>
             </div>
 
-            <div class="widget profile-settings">
-                <h3>Profile Settings</h3>
-                <input type="text" id="usernameInput" placeholder="New Username (Allows HTML)">
-                <input type="text" id="avatarInput" placeholder="Avatar Image URL (Try javascript:alert(1))">
-                <button onclick="updateProfile()">Save Profile</button>
+            <div class="widget danger-zone">
+                <h3>☢️ Advanced System Config</h3>
+                <!-- VULNERABILITY 7: Prototype Pollution -->
+                <p>Import JSON Configuration to merge with system defaults. Try polluting the prototype:</p>
+                <textarea id="jsonConfig" placeholder='{"__proto__": {"isAdmin": true}}'></textarea>
+                <button onclick="importSettings()">Import Config (Pollute Object)</button>
+            </div>
+            
+            <div class="widget danger-zone">
+                <h3>☢️ File System Bio Upload</h3>
+                <!-- VULNERABILITY 8: Arbitrary File Read -> XSS -->
+                <p>Upload a local .html or .txt file directly from your computer. The system will read and execute it:</p>
+                <input type="file" id="bioFile" accept=".html,.txt,.js">
+                <button onclick="uploadBio()">Upload & Render Bio</button>
+                <div id="bioPreview" style="margin-top: 10px; border: 1px dashed red; padding: 10px; background: white;"></div>
+            </div>
+
+            <div class="widget danger-zone">
+                <h3>☢️ Client Denial of Service (DoS)</h3>
+                <!-- VULNERABILITY 9: Client-side DoS -->
+                <p>Push the browser tab to its limits. Warning: This will freeze your browser tab until you force quit it!</p>
+                <button onclick="crashBrowser()" style="background: black; color: red;">Crash Browser</button>
             </div>
 
             <div class="widget notes-section">
                 <h3>Create a New Note</h3>
-                <!-- VULNERABILITY: Stored XSS -->
+                <!-- VULNERABILITY 2: Stored XSS -->
                 <input type="text" id="noteTitle" placeholder="Note Title">
                 <textarea id="noteContent" placeholder="Write your note here... try injecting HTML scripts!"></textarea>
                 <button onclick="addNote()">Publish Note</button>
