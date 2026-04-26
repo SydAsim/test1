@@ -3,20 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vulnerable Note App</title>
+    <title>Vulnerable Dashboard App</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>My Secret Notes</h1>
-        <div class="input-section">
-            <textarea id="noteInput" placeholder="Write your note here... try an XSS payload like <img src='x' onerror='alert(1)'>"></textarea>
-            <button onclick="addNote()">Add Note</button>
+    <nav class="navbar">
+        <h2>Vulnerable Dashboard</h2>
+        <div class="user-profile">
+            <img id="avatarImg" src="default-avatar.png" alt="Avatar" onerror="this.src='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='">
+            <span id="usernameDisplay">Guest</span>
         </div>
-        <div id="notesContainer" class="notes-container">
-            <!-- Notes will be rendered here -->
-        </div>
+    </nav>
+
+    <div class="main-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="widget">
+                <h3>Search Notes</h3>
+                <!-- VULNERABILITY: Reflected XSS if search query is in URL -->
+                <form action="" method="GET">
+                    <input type="text" name="q" placeholder="Search..." id="searchInput">
+                    <button type="submit">Go</button>
+                </form>
+                <div id="searchResults" class="search-results"></div>
+            </div>
+
+            <div class="widget">
+                <h3>Quick Math Calculator</h3>
+                <!-- VULNERABILITY: eval() execution -->
+                <input type="text" id="mathInput" placeholder="e.g., 5 + 10 or alert(1)">
+                <button onclick="calculate()">Calculate</button>
+                <p>Result: <span id="mathResult" style="color:red; font-weight:bold;">0</span></p>
+            </div>
+
+            <div class="widget">
+                <h3>Quick Links</h3>
+                <!-- VULNERABILITY: Open Redirect -->
+                <input type="text" id="redirectUrl" placeholder="Enter URL to visit">
+                <button onclick="redirectToUrl()">Go Visit</button>
+            </div>
+            
+            <div class="widget admin-widget">
+                <h3>Admin Login</h3>
+                <!-- VULNERABILITY: Client-side access control -->
+                <input type="password" id="adminPassword" placeholder="Admin Password">
+                <button onclick="loginAdmin()">Login</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="content">
+            <!-- Hidden Admin Panel -->
+            <div id="adminPanel" class="admin-panel" style="display: none;">
+                <h2>⚠️ SUPER SECRET ADMIN PANEL ⚠️</h2>
+                <p>Welcome, Administrator. You have full access.</p>
+                <button onclick="clearAllData()">Wipe All System Data</button>
+            </div>
+
+            <div class="widget profile-settings">
+                <h3>Profile Settings</h3>
+                <input type="text" id="usernameInput" placeholder="New Username (Allows HTML)">
+                <input type="text" id="avatarInput" placeholder="Avatar Image URL (Try javascript:alert(1))">
+                <button onclick="updateProfile()">Save Profile</button>
+            </div>
+
+            <div class="widget notes-section">
+                <h3>Create a New Note</h3>
+                <!-- VULNERABILITY: Stored XSS -->
+                <input type="text" id="noteTitle" placeholder="Note Title">
+                <textarea id="noteContent" placeholder="Write your note here... try injecting HTML scripts!"></textarea>
+                <button onclick="addNote()">Publish Note</button>
+
+                <h3 style="margin-top: 20px;">Your Notes</h3>
+                <div id="notesContainer" class="notes-container">
+                    <!-- Notes loaded here -->
+                </div>
+            </div>
+        </main>
     </div>
+
     <script src="script.js"></script>
 </body>
 </html>
