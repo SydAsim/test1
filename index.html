@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vulnerable Note App</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>My Secret Notes</h1>
+        <div class="input-section">
+            <textarea id="noteInput" placeholder="Write your note here... try an XSS payload like <img src='x' onerror='alert(1)'>"></textarea>
+            <button onclick="addNote()">Add Note</button>
+        </div>
+        <div id="notesContainer" class="notes-container">
+            <!-- Notes will be rendered here -->
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
