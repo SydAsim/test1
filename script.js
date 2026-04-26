@@ -12,15 +12,19 @@ function init() {
 // ==========================================
 // VULNERABILITY 1: Reflected XSS
 // ==========================================
-// Reads data directly from the URL and injects it into HTML.
-// Try URL: index.html?q=<img src=x onerror=alert('Reflected_XSS')>
 function handleSearch() {
     const urlParams = new URLSearchParams(window.location.search);
     const query = urlParams.get('q');
     if (query) {
         const resultsDiv = document.getElementById('searchResults');
-        // Setting HTML directly from a URL parameter
-        resultsDiv.innerHTML = `Searching for: <strong>${query}</strong> <br>No results found.`;
+        const escapeHTML = (str) => str.replace(/[&<>'"]/g, tag => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            "'": '&#39;',
+            '"': '&quot;'
+        }[tag]));
+        resultsDiv.innerHTML = `Searching for: <strong>${escapeHTML(query)}</strong> <br>No results found.`;
     }
 }
 
@@ -32,15 +36,22 @@ function renderNotes() {
     const container = document.getElementById('notesContainer');
     container.innerHTML = '';
     
+    const escapeHTML = (str) => String(str).replace(/[&<>'"]/g, tag => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        "'": '&#39;',
+        '"': '&quot;'
+    }[tag]));
+
     notes.forEach((note, index) => {
         const noteDiv = document.createElement('div');
         noteDiv.className = 'note';
         
-        // Unsafe rendering: User input is embedded directly as HTML
         noteDiv.innerHTML = `
-            <h4>${note.title}</h4>
-            <div class="meta">By: ${note.author}</div>
-            <div class="content">${note.content}</div>
+            <h4>${escapeHTML(note.title)}</h4>
+            <div class="meta">By: ${escapeHTML(note.author)}</div>
+            <div class="content">${escapeHTML(note.content)}</div>
             <button class="delete-btn" onclick="deleteNote(${index})">Delete</button>
         `;
         container.appendChild(noteDiv);
@@ -75,14 +86,29 @@ function deleteNote(index) {
 // ==========================================
 // Admin check is fully visible in JS. Any user can view the source, 
 // find the password, or just run the JS to reveal the panel!
-function loginAdmin() {
+async function loginAdmin() {
     const password = document.getElementById('adminPassword').value;
-    // Hardcoded secret in client-side code
-    if (password === "supersecret2026") {
-        document.getElementById('adminPanel').style.display = 'block';
-        alert("Welcome Admin. Panel Unlocked.");
-    } else {
-        alert("Incorrect Admin Password!");
+    
+    try {
+        const response = await fetch('/api/admin/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ password })
+        });
+        
+        if (response.ok) {
+            const adminPanelContent = await response.text();
+            const adminPanel = document.getElementById('adminPanel');
+            adminPanel.innerHTML = adminPanelContent;
+            adminPanel.style.display = 'block';
+            alert("Welcome Admin. Panel Unlocked.");
+        } else {
+            alert("Incorrect Admin Password!");
+        }
+    } catch (error) {
+        alert("Error connecting to server.");
     }
 }
 
@@ -103,8 +129,10 @@ function clearAllData() {
 function calculate() {
     const input = document.getElementById('mathInput').value;
     try {
-        // eval() executes whatever string is passed to it as actual JavaScript code.
-        const result = eval(input);
+        if (!/^[0-9+\-*/().\s]+$/.test(input)) {
+            throw new Error('Invalid characters in math expression');
+        }
+        const result = Function('"use strict";return (' + input + ')')();
         document.getElementById('mathResult').innerText = result;
     } catch (e) {
         document.getElementById('mathResult').innerText = 'Error in Calculation';
@@ -114,11 +142,19 @@ function calculate() {
 // ==========================================
 // VULNERABILITY 5: Open Redirect
 // ==========================================
-// Allows an attacker to craft a link that redirects users to malicious sites.
+// Fixed: Validates that the parsed URL has the same origin as the current site to prevent external redirection.
 function redirectToUrl() {
     const url = document.getElementById('redirectUrl').value;
-    // No validation on the URL destination
-    window.location.href = url;
+    try {
+        const parsedUrl = new URL(url, window.location.origin);
+        if (parsedUrl.origin === window.location.origin) {
+            window.location.href = parsedUrl.href;
+        } else {
+            alert("External redirects are not allowed.");
+        }
+    } catch (e) {
+        alert("Invalid URL provided.");
+    }
 }
 
 // ==========================================
@@ -139,11 +175,16 @@ function renderProfile() {
     const nameDisplay = document.getElementById('usernameDisplay');
     const imgDisplay = document.getElementById('avatarImg');
     
-    // Unsafe rendering:
-    nameDisplay.innerHTML = userProfile.username;
+    nameDisplay.textContent = userProfile.username;
     if (userProfile.avatar) {
-        // Unsafe attribute rendering, allows javascript: URIs
-        imgDisplay.setAttribute('src', userProfile.avatar);
+        try {
+            const parsedUrl = new URL(userProfile.avatar, window.location.origin);
+            if (['http:', 'https:', 'data:'].includes(parsedUrl.protocol)) {
+                imgDisplay.setAttribute('src', userProfile.avatar);
+            }
+        } catch (e) {
+            // Invalid URL
+        }
     }
 }
 
