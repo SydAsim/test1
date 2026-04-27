@@ -4,24 +4,18 @@ let userProfile = JSON.parse(localStorage.getItem('dashboard_profile')) || { use
 function init() {
     renderNotes();
     handleSearch();
+    renderProfile();
 }
 
-<<<<<<< HEAD
-// 1. Reflected XSS
-=======
 // ==========================================
 // VULNERABILITY 1: Reflected XSS
 // ==========================================
->>>>>>> a44394d079eb60d379d13ad66252e8f095a75028
 function handleSearch() {
     const urlParams = new URLSearchParams(window.location.search);
     const query = urlParams.get('q');
     if (query) {
-<<<<<<< HEAD
-        document.getElementById('searchResults').innerHTML = `Searching for: <strong>${query}</strong> <br>No results found.`;
-=======
         const resultsDiv = document.getElementById('searchResults');
-        const escapeHTML = (str) => str.replace(/[&<>'"]/g, tag => ({
+        const escapeHTML = (str) => String(str).replace(/[&<>'"]/g, tag => ({
             '&': '&amp;',
             '<': '&lt;',
             '>': '&gt;',
@@ -29,42 +23,34 @@ function handleSearch() {
             '"': '&quot;'
         }[tag]));
         resultsDiv.innerHTML = `Searching for: <strong>${escapeHTML(query)}</strong> <br>No results found.`;
->>>>>>> a44394d079eb60d379d13ad66252e8f095a75028
     }
 }
 
 // 2. Stored XSS
 function renderNotes() {
     const container = document.getElementById('notesContainer');
-    container.innerHTML = '';
-<<<<<<< HEAD
-    notes.forEach((note, index) => {
-        const noteDiv = document.createElement('div');
-        noteDiv.className = 'note';
-        noteDiv.innerHTML = `
-            <h4>${note.title}</h4>
-            <div class="content">${note.content}</div>
-=======
-    
-    const escapeHTML = (str) => String(str).replace(/[&<>'"]/g, tag => ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        "'": '&#39;',
-        '"': '&quot;'
-    }[tag]));
+    container.textContent = ''; // Safely clear container
 
     notes.forEach((note, index) => {
         const noteDiv = document.createElement('div');
         noteDiv.className = 'note';
         
-        noteDiv.innerHTML = `
-            <h4>${escapeHTML(note.title)}</h4>
-            <div class="meta">By: ${escapeHTML(note.author)}</div>
-            <div class="content">${escapeHTML(note.content)}</div>
->>>>>>> a44394d079eb60d379d13ad66252e8f095a75028
-            <button class="delete-btn" onclick="deleteNote(${index})">Delete</button>
-        `;
+        const titleEl = document.createElement('h4');
+        titleEl.textContent = note.title || 'Untitled';
+        
+        const contentEl = document.createElement('div');
+        contentEl.className = 'content';
+        contentEl.textContent = note.content || 'No content';
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'delete-btn';
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.onclick = () => deleteNote(index);
+        
+        noteDiv.appendChild(titleEl);
+        noteDiv.appendChild(contentEl);
+        noteDiv.appendChild(deleteBtn);
+        
         container.appendChild(noteDiv);
     });
 }
@@ -87,20 +73,9 @@ function deleteNote(index) {
     renderNotes();
 }
 
-<<<<<<< HEAD
-// 3. Broken Access Control
-function loginAdmin() {
-    if (document.getElementById('adminPassword').value === "supersecret2026") {
-        document.getElementById('adminPanel').style.display = 'block';
-        alert("Welcome Admin. Panel Unlocked.");
-    } else {
-        alert("Incorrect Admin Password!");
-=======
 // ==========================================
 // VULNERABILITY 3: Broken Access Control (Client-Side Auth)
 // ==========================================
-// Admin check is fully visible in JS. Any user can view the source, 
-// find the password, or just run the JS to reveal the panel!
 async function loginAdmin() {
     const password = document.getElementById('adminPassword').value;
     
@@ -124,7 +99,6 @@ async function loginAdmin() {
         }
     } catch (error) {
         alert("Error connecting to server.");
->>>>>>> a44394d079eb60d379d13ad66252e8f095a75028
     }
 }
 
@@ -138,34 +112,73 @@ function clearAllData() {
 // 4. eval() XSS
 function calculate() {
     try {
-<<<<<<< HEAD
-        document.getElementById('mathResult').innerText = eval(document.getElementById('mathInput').value);
-=======
+        const input = document.getElementById('mathInput').value;
         if (!/^[0-9+\-*/().\s]+$/.test(input)) {
             throw new Error('Invalid characters in math expression');
         }
-        const result = Function('"use strict";return (' + input + ')')();
+        
+        // Safely parse and evaluate the math expression without eval() or Function()
+        const tokens = input.match(/\d+\.\d+|\d+|[+\-*/()]/g) || [];
+        const output = [];
+        const ops = [];
+        const precedence = { '+': 1, '-': 1, '*': 2, '/': 2 };
+
+        for (const token of tokens) {
+            if (/\d/.test(token)) {
+                output.push(parseFloat(token));
+            } else if (token === '(') {
+                ops.push(token);
+            } else if (token === ')') {
+                while (ops.length && ops[ops.length - 1] !== '(') {
+                    output.push(ops.pop());
+                }
+                ops.pop();
+            } else {
+                while (ops.length && precedence[ops[ops.length - 1]] >= precedence[token]) {
+                    output.push(ops.pop());
+                }
+                ops.push(token);
+            }
+        }
+        while (ops.length) output.push(ops.pop());
+
+        const stack = [];
+        for (const token of output) {
+            if (typeof token === 'number') {
+                stack.push(token);
+            } else {
+                const b = stack.pop();
+                const a = stack.pop() || 0;
+                if (token === '+') stack.push(a + b);
+                if (token === '-') stack.push(a - b);
+                if (token === '*') stack.push(a * b);
+                if (token === '/') stack.push(a / b);
+            }
+        }
+
+        const result = stack.length ? stack[0] : '';
         document.getElementById('mathResult').innerText = result;
->>>>>>> a44394d079eb60d379d13ad66252e8f095a75028
     } catch (e) {
         document.getElementById('mathResult').innerText = 'Error';
     }
 }
 
-<<<<<<< HEAD
-// 5. Open Redirect
-function redirectToUrl() {
-    window.location.href = document.getElementById('redirectUrl').value;
-=======
 // ==========================================
 // VULNERABILITY 5: Open Redirect
 // ==========================================
-// Fixed: Validates that the parsed URL has the same origin as the current site to prevent external redirection.
 function redirectToUrl() {
     const url = document.getElementById('redirectUrl').value;
     try {
         const parsedUrl = new URL(url, window.location.origin);
-        if (parsedUrl.origin === window.location.origin) {
+        
+        // Ensure safe protocols (prevents javascript:, data:, etc.)
+        if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+            alert("Invalid protocol.");
+            return;
+        }
+
+        // Validate origin to prevent external redirects and 'null' origin bypasses
+        if (window.location.origin !== 'null' && parsedUrl.origin === window.location.origin) {
             window.location.href = parsedUrl.href;
         } else {
             alert("External redirects are not allowed.");
@@ -173,17 +186,23 @@ function redirectToUrl() {
     } catch (e) {
         alert("Invalid URL provided.");
     }
->>>>>>> a44394d079eb60d379d13ad66252e8f095a75028
 }
 
 // ==========================================
 // VULNERABILITY 7: Prototype Pollution
 // ==========================================
-// Vulnerable merge function that copies properties without checking keys.
 function merge(target, source) {
+    if (typeof target !== 'object' || target === null) return target;
+    if (typeof source !== 'object' || source === null) return target;
+
     for (let key in source) {
+        if (!Object.prototype.hasOwnProperty.call(source, key)) continue;
+        if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+        
         if (typeof source[key] === 'object' && source[key] !== null) {
-            if (!target[key]) target[key] = {};
+            if (typeof target[key] !== 'object' || target[key] === null) {
+                target[key] = Array.isArray(source[key]) ? [] : {};
+            }
             merge(target[key], source[key]);
         } else {
             target[key] = source[key];
@@ -192,18 +211,14 @@ function merge(target, source) {
     return target;
 }
 
-<<<<<<< HEAD
 function importSettings() {
     const input = document.getElementById('jsonConfig').value;
     try {
         const parsed = JSON.parse(input);
         let currentSettings = {};
         
-        // The danger: merging user JSON directly into an object.
-        // If JSON is {"__proto__": {"isAdmin": true}}, it pollutes Object.prototype
         merge(currentSettings, parsed);
         
-        // Let's test if the prototype was polluted:
         let emptyObjectTest = {}; 
         if (emptyObjectTest.isAdmin === true) {
             document.getElementById('adminPanel').style.display = 'block';
@@ -213,13 +228,18 @@ function importSettings() {
         }
     } catch (e) {
         alert("Invalid JSON format!");
-=======
+    }
+}
+
 function renderProfile() {
     const nameDisplay = document.getElementById('usernameDisplay');
     const imgDisplay = document.getElementById('avatarImg');
     
-    nameDisplay.textContent = userProfile.username;
-    if (userProfile.avatar) {
+    if (nameDisplay) {
+        nameDisplay.textContent = userProfile.username;
+    }
+    
+    if (userProfile.avatar && imgDisplay) {
         try {
             const parsedUrl = new URL(userProfile.avatar, window.location.origin);
             if (['http:', 'https:', 'data:'].includes(parsedUrl.protocol)) {
@@ -228,14 +248,12 @@ function renderProfile() {
         } catch (e) {
             // Invalid URL
         }
->>>>>>> a44394d079eb60d379d13ad66252e8f095a75028
     }
 }
 
 // ==========================================
 // VULNERABILITY 8: Arbitrary File Read -> XSS
 // ==========================================
-// Reads any file uploaded and injects the raw contents into the DOM.
 function uploadBio() {
     const fileInput = document.getElementById('bioFile');
     if (fileInput.files.length > 0) {
@@ -243,8 +261,8 @@ function uploadBio() {
         const reader = new FileReader();
         
         reader.onload = function(e) {
-            // DANGER: Taking raw file contents and executing it as HTML!
-            document.getElementById('bioPreview').innerHTML = e.target.result;
+            // Use textContent to safely display raw text instead of innerHTML
+            document.getElementById('bioPreview').textContent = e.target.result;
             alert(`File "${file.name}" loaded successfully.`);
         };
         
@@ -257,34 +275,16 @@ function uploadBio() {
 // ==========================================
 // VULNERABILITY 9: Client-Side Denial of Service (DoS)
 // ==========================================
-// Locks up the user's browser tab infinitely.
 function crashBrowser() {
-    if(confirm("DANGER: Are you sure? This will enter an infinite loop and crash your browser tab! You will have to force quit it.")) {
-        alert("Goodbye...");
-        // Infinite loop blocking the main UI thread.
-        while (true) {
-            history.pushState(0, 0, "?crashed=" + Math.random());
-            console.log("Memory leak filling up...");
-        }
-    }
+    console.warn("Client crash prevented: history stack manipulation loop has been removed.");
 }
 
 // ==========================================
 // SIMULATOR: Data Exfiltration & Keylogger
 // ==========================================
 function runSimulatedMalware() {
-    console.error("☠️ MALWARE ACTIVATED ☠️");
-    
-    // 1. Steal Data
-    const stolenData = JSON.stringify(localStorage);
-    console.error("STEALING DATA:", stolenData);
-    
-    // 2. Install Keylogger
-    document.addEventListener('keydown', function(e) {
-        console.error("KEYLOGGED: " + e.key);
-    });
-    
-    alert("Malware Injected! Open Developer Tools (F12) -> Console, and start typing on your keyboard to see the keylogger in action, and see your stolen LocalStorage data.");
+    console.error("Malware simulation disabled.");
+    alert("Malware simulation safely disabled.");
 }
 
 init();
