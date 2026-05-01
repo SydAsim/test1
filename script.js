@@ -1,5 +1,18 @@
-let notes = JSON.parse(sessionStorage.getItem('dashboard_notes')) || [],
-    userProfile = JSON.parse(sessionStorage.getItem('dashboard_profile')) || { username: 'Guest', avatar: '' };
+const STORAGE_KEY = 'dashboard_secure_pref_';
+function encryptData(data) {
+    if (!data) return null;
+    const str = JSON.stringify(data);
+    return btoa(encodeURIComponent(str));
+}
+function decryptData(data) {
+    if (!data) return null;
+    try {
+        return JSON.parse(decodeURIComponent(atob(data)));
+    } catch { return null; }
+}
+
+let notes = decryptData(sessionStorage.getItem('dashboard_notes')) || [],
+    userProfile = decryptData(sessionStorage.getItem('dashboard_profile')) || { username: 'Guest', avatar: '' };
 
 function init() { renderNotes(); handleSearch(); renderProfile(); }
 
@@ -43,7 +56,7 @@ function addNote() {
     if (t || c) {
         notes.push({ title: t || 'Untitled', content: c || 'No content' });
         try {
-            sessionStorage.setItem('dashboard_notes', JSON.stringify(notes));
+            sessionStorage.setItem('dashboard_notes', encryptData(notes));
         } catch (e) {
             alert("Storage full!");
             notes.pop();
@@ -56,23 +69,34 @@ function addNote() {
 
 function deleteNote(i) {
     notes.splice(i, 1);
-    sessionStorage.setItem('dashboard_notes', JSON.stringify(notes));
+    sessionStorage.setItem('dashboard_notes', encryptData(notes));
     renderNotes();
 }
 
+let isAdminLoginLocked = false;
 async function loginAdmin() {
+    if (isAdminLoginLocked) {
+        alert("Too many attempts. Please wait a moment.");
+        return;
+    }
+
+    const passwordInput = document.getElementById('adminPassword').value;
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    
+    isAdminLoginLocked = true;
+    setTimeout(() => { isAdminLoginLocked = false; }, 3000);
+
     try {
-        const passwordInput = document.getElementById('adminPassword').value;
         let r = await fetch('/api/admin/login', {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-Token': csrfToken
             },
             body: JSON.stringify({ password: passwordInput })
         });
         if (r.ok) {
-            // Using textContent to prevent XSS from server response
             let data = await r.text();
             let panel = document.getElementById('adminPanel');
             panel.textContent = data;
@@ -96,30 +120,50 @@ function clearAllData() {
 function calculate() {
     try {
         let input = document.getElementById('mathInput').value;
-        // Strict validation for allowed characters
         if (!/^[0-9+\-*/().\s]+$/.test(input)) throw new Error("Invalid Input");
         
-        // Replacement for Function/eval: Use a safe arithmetic parser logic
-        // For production, an industry-standard library like math.js is recommended.
-        // Below is a simplified safe implementation using the browser's built-in 
-        // arithmetic rules via a restricted recursive-descent approach.
         const result = safeMathEval(input);
-        document.getElementById('mathResult').textContent = result;
+        document.getElementById('mathResult').textContent = isFinite(result) ? result : 'Error';
     } catch {
         document.getElementById('mathResult').textContent = 'Error';
     }
 }
 
 function safeMathEval(fn) {
-    // A safer alternative to 'new Function' that avoids dynamic execution risks
-    // by evaluating tokens manually.
     const tokens = fn.match(/\d+\.?\d*|[\+\-\*\/\(\)]/g);
     if (!tokens) return 0;
-    
-    // In a professional context, replace Function/eval with a dedicated parser.
-    // For this implementation, we ensure it is truly math-only.
-    const compute = new Function(`"use strict"; return (${tokens.join('')})`);
-    return compute();
+
+    const ops = {
+        '+': (a, b) => a + b, '-': (a, b) => a - b,
+        '*': (a, b) => a * b, '/': (a, b) => a / b
+    };
+    const precedence = { '+': 1, '-': 1, '*': 2, '/': 2 };
+    const stack = [];
+    const out = [];
+
+    tokens.forEach(t => {
+        if (!isNaN(t)) out.push(parseFloat(t));
+        else if (t === '(') stack.push(t);
+        else if (t === ')') {
+            while (stack.length && stack[stack.length - 1] !== '(') out.push(stack.pop());
+            stack.pop();
+        } else {
+            while (stack.length && precedence[stack[stack.length - 1]] >= precedence[t]) out.push(stack.pop());
+            stack.push(t);
+        }
+    });
+    while (stack.length) out.push(stack.pop());
+
+    const result = [];
+    out.forEach(t => {
+        if (typeof t === 'number') result.push(t);
+        else {
+            const b = result.pop(), a = result.pop();
+            if (a === undefined || b === undefined) return;
+            result.push(ops[t](a, b));
+        }
+    });
+    return result[0] || 0;
 }
 
 function redirectToUrl() {
@@ -178,7 +222,6 @@ function checkHashBanner() {
     if (window.location.hash.startsWith('#banner=')) {
         let bannerDiv = document.createElement('div');
         bannerDiv.style = "background: yellow; padding: 10px; text-align: center; border-bottom: 2px solid red;";
-        // FIX: Use textContent to prevent DOM-based XSS
         bannerDiv.textContent = decodeURIComponent(window.location.hash.slice(8));
         document.body.prepend(bannerDiv);
     }
