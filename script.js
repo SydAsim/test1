@@ -96,30 +96,105 @@ function clearAllData() {
 function calculate() {
     try {
         let input = document.getElementById('mathInput').value;
-        // Strict validation for allowed characters
-        if (!/^[0-9+\-*/().\s]+$/.test(input)) throw new Error("Invalid Input");
-        
-        // Replacement for Function/eval: Use a safe arithmetic parser logic
-        // For production, an industry-standard library like math.js is recommended.
-        // Below is a simplified safe implementation using the browser's built-in 
-        // arithmetic rules via a restricted recursive-descent approach.
+        // All validation for allowed characters and expression structure is now
+        // handled internally by safeMathEval, which uses a dedicated parser.
         const result = safeMathEval(input);
         document.getElementById('mathResult').textContent = result;
-    } catch {
-        document.getElementById('mathResult').textContent = 'Error';
+    } catch (e) {
+        document.getElementById('mathResult').textContent = e.message || 'Error';
     }
 }
 
-function safeMathEval(fn) {
-    // A safer alternative to 'new Function' that avoids dynamic execution risks
-    // by evaluating tokens manually.
-    const tokens = fn.match(/\d+\.?\d*|[\+\-\*\/\(\)]/g);
-    if (!tokens) return 0;
-    
-    // In a professional context, replace Function/eval with a dedicated parser.
-    // For this implementation, we ensure it is truly math-only.
-    const compute = new Function(`"use strict"; return (${tokens.join('')})`);
-    return compute();
+function safeMathEval(expression) {
+    // Replacement for Function/eval: Uses a safe arithmetic parser based on the
+    // Shunting-Yard algorithm (RPN conversion) and RPN evaluation.
+    // This approach avoids dynamic JavaScript execution and is resistant to injection.
+    // For production, an industry-standard library like math.js is recommended.
+
+    // Strict validation for allowed characters (numbers, operators, parentheses, whitespace)
+    if (!/^[0-9+\-*/().\s]+$/.test(expression)) {
+        throw new Error("Invalid characters in expression.");
+    }
+
+    // Tokenize the expression
+    const tokens = expression.match(/\d+\.?\d*|[\+\-\*\/\(\)]/g);
+    if (!tokens || tokens.join('').replace(/\s/g, '') !== expression.replace(/\s/g, '')) {
+        // Additional check to ensure all input characters are consumed by valid tokens
+        // and no unrecognized characters remain after stripping whitespace.
+        throw new Error("Invalid expression structure or unrecognized characters.");
+    }
+
+    const precedence = { '+': 1, '-': 1, '*': 2, '/': 2 };
+    const isOperator = token => token in precedence;
+
+    const outputQueue = [];
+    const operatorStack = [];
+
+    for (const token of tokens) {
+        if (!isNaN(parseFloat(token))) { // It's a number
+            outputQueue.push(parseFloat(token));
+        } else if (isOperator(token)) {
+            while (
+                operatorStack.length > 0 &&
+                isOperator(operatorStack[operatorStack.length - 1]) &&
+                precedence[operatorStack[operatorStack.length - 1]] >= precedence[token]
+            ) {
+                outputQueue.push(operatorStack.pop());
+            }
+            operatorStack.push(token);
+        } else if (token === '(') {
+            operatorStack.push(token);
+        } else if (token === ')') {
+            while (operatorStack.length > 0 && operatorStack[operatorStack.length - 1] !== '(') {
+                outputQueue.push(operatorStack.pop());
+            }
+            if (operatorStack.length === 0) {
+                throw new Error("Mismatched parentheses.");
+            }
+            operatorStack.pop(); // Pop the '('
+        } else {
+            // Should ideally be caught by the initial regex, but as a fallback.
+            throw new Error("Unrecognized token: " + token);
+        }
+    }
+
+    while (operatorStack.length > 0) {
+        if (operatorStack[operatorStack.length - 1] === '(') {
+            throw new Error("Mismatched parentheses.");
+        }
+        outputQueue.push(operatorStack.pop());
+    }
+
+    // Evaluate RPN
+    const valueStack = [];
+    for (const token of outputQueue) {
+        if (typeof token === 'number') {
+            valueStack.push(token);
+        } else { // It's an operator
+            if (valueStack.length < 2) {
+                throw new Error("Invalid expression structure (insufficient operands for operator: " + token + ").");
+            }
+            const b = valueStack.pop();
+            const a = valueStack.pop();
+            switch (token) {
+                case '+': valueStack.push(a + b); break;
+                case '-': valueStack.push(a - b); break;
+                case '*': valueStack.push(a * b); break;
+                case '/':
+                    if (b === 0) throw new Error("Division by zero.");
+                    valueStack.push(a / b);
+                    break;
+                default:
+                    throw new Error("Unknown operator encountered during RPN evaluation: " + token);
+            }
+        }
+    }
+
+    if (valueStack.length !== 1) {
+        throw new Error("Invalid expression structure (resulted in too many or too few operands).");
+    }
+
+    return valueStack.pop();
 }
 
 function redirectToUrl() {
@@ -156,10 +231,40 @@ function importSettings() {
 function renderProfile() {
     document.getElementById('usernameDisplay').textContent = userProfile.username;
     try {
-        if (userProfile.avatar && ['http:', 'https:', 'data:'].includes(new URL(userProfile.avatar, window.location.origin).protocol)) {
-            document.getElementById('avatarImg').setAttribute('src', userProfile.avatar);
+        const avatarImgElement = document.getElementById('avatarImg');
+        if (userProfile.avatar) {
+            const url = new URL(userProfile.avatar, window.location.origin);
+
+            // Only allow same-origin, http(s) protocols, or whitelisted data URIs
+            if (url.origin === window.location.origin || url.protocol === 'https:' || url.protocol === 'http:') {
+                avatarImgElement.setAttribute('src', url.href);
+            } else if (url.protocol === 'data:') {
+                // Validate data URI to prevent SVG XSS by explicitly disallowing 'image/svg+xml'
+                // and ensuring it's a valid image MIME type.
+                const mimeMatch = userProfile.avatar.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9\-\+\.]+)(;base64)?/);
+                if (mimeMatch && mimeMatch[1].startsWith('image/') && mimeMatch[1] !== 'image/svg+xml') {
+                    avatarImgElement.setAttribute('src', userProfile.avatar);
+                } else {
+                    console.warn("Blocked potentially malicious or unsupported avatar data URI:", userProfile.avatar);
+                    avatarImgElement.removeAttribute('src'); // Clear potentially bad src
+                    avatarImgElement.setAttribute('alt', 'Invalid avatar'); // Provide alt text for accessibility
+                }
+            } else {
+                // Block other protocols like javascript:, ftp:, etc.
+                console.warn("Blocked unsupported avatar protocol:", userProfile.avatar);
+                avatarImgElement.removeAttribute('src');
+                avatarImgElement.setAttribute('alt', 'Invalid avatar');
+            }
+        } else {
+            // If avatar is empty, clear the src attribute and provide a default alt.
+            avatarImgElement.removeAttribute('src');
+            avatarImgElement.setAttribute('alt', 'No avatar');
         }
-    } catch {}
+    } catch (e) {
+        console.error("Error setting avatar:", e);
+        document.getElementById('avatarImg').removeAttribute('src'); // Clear on error
+        document.getElementById('avatarImg').setAttribute('alt', 'Error loading avatar');
+    }
 }
 
 function uploadBio() {
