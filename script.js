@@ -96,30 +96,110 @@ function clearAllData() {
 function calculate() {
     try {
         let input = document.getElementById('mathInput').value;
-        // Strict validation for allowed characters
-        if (!/^[0-9+\-*/().\s]+$/.test(input)) throw new Error("Invalid Input");
+        // Strict validation for allowed characters (initial client-side filter)
+        if (!/^[0-9+\-*\/().\s]+$/.test(input)) throw new Error("Invalid Input: Contains disallowed characters.");
         
-        // Replacement for Function/eval: Use a safe arithmetic parser logic
-        // For production, an industry-standard library like math.js is recommended.
-        // Below is a simplified safe implementation using the browser's built-in 
-        // arithmetic rules via a restricted recursive-descent approach.
+        // Use a safe arithmetic parser logic instead of dynamic code evaluation.
+        // This parser avoids `new Function()` or `eval()` by explicitly tokenizing
+        // and evaluating the mathematical expression based on operator precedence.
         const result = safeMathEval(input);
         document.getElementById('mathResult').textContent = result;
-    } catch {
-        document.getElementById('mathResult').textContent = 'Error';
+    } catch (e) {
+        document.getElementById('mathResult').textContent = 'Error: ' + e.message;
     }
 }
 
-function safeMathEval(fn) {
-    // A safer alternative to 'new Function' that avoids dynamic execution risks
-    // by evaluating tokens manually.
-    const tokens = fn.match(/\d+\.?\d*|[\+\-\*\/\(\)]/g);
-    if (!tokens) return 0;
-    
-    // In a professional context, replace Function/eval with a dedicated parser.
-    // For this implementation, we ensure it is truly math-only.
-    const compute = new Function(`"use strict"; return (${tokens.join('')})`);
-    return compute();
+function safeMathEval(expression) {
+    // Implements a simple recursive descent parser for basic arithmetic expressions
+    // to avoid the use of new Function() or eval(), which are severe security risks.
+
+    // Regex to tokenize numbers (integers and floats) and operators/parentheses.
+    // Whitespace is implicitly handled by matching only valid tokens.
+    const tokens = expression.match(/\d+\.?\d*|\+|\-|\*|\/|\(|\)/g);
+
+    if (!tokens) {
+        throw new Error("Invalid or empty expression.");
+    }
+
+    let position = 0; // Current position in the tokens array
+
+    // Helper function to get the current token without advancing
+    function peek() {
+        return tokens[position];
+    }
+
+    // Helper function to consume the current token and advance
+    function consume(expectedToken) {
+        if (position >= tokens.length) {
+            if (expectedToken) throw new Error(`Unexpected end of expression, expected '${expectedToken}'`);
+            throw new Error("Unexpected end of expression.");
+        }
+        const currentToken = tokens[position];
+        if (expectedToken && currentToken !== expectedToken) {
+            throw new Error(`Expected '${expectedToken}' but got '${currentToken}' at position ${position}`);
+        }
+        position++;
+        return currentToken;
+    }
+
+    // Parses a number or a parenthesized expression
+    function parseFactor() {
+        const token = peek();
+        if (token === '(') {
+            consume('('); // Consume '('
+            const result = parseExpression();
+            consume(')'); // Consume ')'
+            return result;
+        } else if (token === '-') { // Handle unary minus
+            consume('-');
+            return -parseFactor();
+        } else if (/\d+\.?\d*/.test(token)) {
+            return parseFloat(consume());
+        }
+        throw new Error(`Unexpected token: '${token}' at position ${position}`);
+    }
+
+    // Parses terms (multiplication and division)
+    function parseTerm() {
+        let result = parseFactor();
+        while (peek() === '*' || peek() === '/') {
+            const operator = consume();
+            const nextFactor = parseFactor();
+            if (operator === '*') {
+                result *= nextFactor;
+            } else if (operator === '/') {
+                if (nextFactor === 0) {
+                    throw new Error("Division by zero");
+                }
+                result /= nextFactor;
+            }
+        }
+        return result;
+    }
+
+    // Parses expressions (addition and subtraction)
+    function parseExpression() {
+        let result = parseTerm();
+        while (peek() === '+' || peek() === '-') {
+            const operator = consume();
+            const nextTerm = parseTerm();
+            if (operator === '+') {
+                result += nextTerm;
+            } else if (operator === '-') {
+                result -= nextTerm;
+            }
+        }
+        return result;
+    }
+
+    const result = parseExpression();
+
+    // After parsing the entire expression, ensure no extra tokens are left
+    if (position < tokens.length) {
+        throw new Error(`Unexpected tokens at end of expression: '${tokens.slice(position).join(' ')}'`);
+    }
+
+    return result;
 }
 
 function redirectToUrl() {
@@ -134,6 +214,7 @@ function redirectToUrl() {
 
 function merge(t, s) {
     for (let k in s) {
+        // Securely prevent prototype pollution
         if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
         if (typeof s[k] === 'object' && s[k] !== null) {
             if (!t[k]) t[k] = {};
@@ -158,8 +239,12 @@ function renderProfile() {
     try {
         if (userProfile.avatar && ['http:', 'https:', 'data:'].includes(new URL(userProfile.avatar, window.location.origin).protocol)) {
             document.getElementById('avatarImg').setAttribute('src', userProfile.avatar);
+        } else {
+            document.getElementById('avatarImg').setAttribute('src', 'default_avatar.png'); // Fallback for invalid/empty avatar
         }
-    } catch {}
+    } catch {
+        document.getElementById('avatarImg').setAttribute('src', 'default_avatar.png'); // Fallback for URL parsing errors
+    }
 }
 
 function uploadBio() {
@@ -167,7 +252,7 @@ function uploadBio() {
     if (f.files.length) {
         let r = new FileReader();
         r.onload = e => {
-            document.getElementById('bioPreview').textContent = e.target.result;
+            document.getElementById('bioPreview').textContent = e.target.result; // Use textContent to prevent XSS
             alert(`Loaded ${f.files[0].name}`);
         };
         r.readAsText(f.files[0]);
