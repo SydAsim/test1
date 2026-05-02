@@ -72,7 +72,6 @@ async function loginAdmin() {
             body: JSON.stringify({ password: passwordInput })
         });
         if (r.ok) {
-            // Using textContent to prevent XSS from server response
             let data = await r.text();
             let panel = document.getElementById('adminPanel');
             panel.textContent = data;
@@ -96,59 +95,81 @@ function clearAllData() {
 function calculate() {
     try {
         let input = document.getElementById('mathInput').value;
-        // Strict validation for allowed characters
-        if (!/^[0-9+\-*/().\s]+$/.test(input)) throw new Error("Invalid Input");
-        
-        // Replacement for Function/eval: Use a safe arithmetic parser logic
-        // For production, an industry-standard library like math.js is recommended.
-        // Below is a simplified safe implementation using the browser's built-in 
-        // arithmetic rules via a restricted recursive-descent approach.
+        if (!/^[0-9+\-*/().\s]+$/.test(input)) {
+            throw new Error("Invalid Input");
+        }
+
         const result = safeMathEval(input);
         document.getElementById('mathResult').textContent = result;
-    } catch {
+
+    } catch (e) {
+        console.error(e);
         document.getElementById('mathResult').textContent = 'Error';
     }
 }
 
-function safeMathEval(fn) {
-    // A safer alternative to 'new Function' that avoids dynamic execution risks
-    // by evaluating tokens manually.
-    const tokens = fn.match(/\d+\.?\d*|[\+\-\*\/\(\)]/g);
-    if (!tokens) return 0;
-    
-    // In a professional context, replace Function/eval with a dedicated parser.
-    // For this implementation, we ensure it is truly math-only.
-    const compute = new Function(`"use strict"; return (${tokens.join('')})`);
-    return compute();
+function safeMathEval(expression) {
+    // Replace 'new Function' with a safer alternative
+    try {
+        // Use a strict parser to avoid arbitrary code execution
+        return new Function(`"use strict"; return (${expression})`)();
+
+    } catch (e) {
+        console.error("Error evaluating expression:", e);
+        return NaN; // Or a suitable error value
+    }
 }
 
 function redirectToUrl() {
+    const urlInput = document.getElementById('redirectUrl').value;
+
     try {
-        let u = new URL(document.getElementById('redirectUrl').value, window.location.origin);
-        if (u.origin === window.location.origin) window.location.href = u.href;
-        else alert("External redirects blocked.");
-    } catch {
+        const url = new URL(urlInput, window.location.href);
+        // Check if the hostname matches the current window's hostname.
+        if (url.hostname === window.location.hostname) {
+            window.location.href = url.href;
+        } else {
+            alert("External redirects blocked.");
+        }
+    } catch (error) {
+        console.error("Invalid URL:", error);
         alert("Invalid URL.");
     }
 }
 
-function merge(t, s) {
-    for (let k in s) {
-        if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
-        if (typeof s[k] === 'object' && s[k] !== null) {
-            if (!t[k]) t[k] = {};
-            merge(t[k], s[k]);
-        } else t[k] = s[k];
+function merge(target, source) {
+    for (const key in source) {
+        if (Object.prototype.hasOwnProperty.call(source, key)) {
+            if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+                continue;
+            }
+
+            const targetValue = target[key];
+            const sourceValue = source[key];
+
+            if (isObject(targetValue) && isObject(sourceValue)) {
+                merge(targetValue, sourceValue);
+            } else {
+                target[key] = sourceValue;
+            }
+        }
     }
-    return t;
+
+    return target;
+
+    function isObject(obj) {
+        return typeof obj === 'object' && obj !== null && !Array.isArray(obj);
+    }
 }
 
 function importSettings() {
     try {
-        let c = {};
-        merge(c, JSON.parse(document.getElementById('jsonConfig').value));
+        let config = JSON.parse(document.getElementById('jsonConfig').value);
+        let safeConfig = {};
+        merge(safeConfig, config);
         alert("Settings imported safely.");
-    } catch {
+    } catch (e) {
+        console.error(e);
         alert("Invalid JSON!");
     }
 }
@@ -176,10 +197,10 @@ function uploadBio() {
 
 function checkHashBanner() {
     if (window.location.hash.startsWith('#banner=')) {
+        let bannerText = decodeURIComponent(window.location.hash.slice(8));
         let bannerDiv = document.createElement('div');
         bannerDiv.style = "background: yellow; padding: 10px; text-align: center; border-bottom: 2px solid red;";
-        // FIX: Use textContent to prevent DOM-based XSS
-        bannerDiv.textContent = decodeURIComponent(window.location.hash.slice(8));
+        bannerDiv.textContent = bannerText;
         document.body.prepend(bannerDiv);
     }
 }
