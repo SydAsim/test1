@@ -7,13 +7,8 @@ function handleSearch() {
     let q = new URLSearchParams(window.location.search).get('q');
     if (q) {
         let r = document.getElementById('searchResults');
-        r.textContent = '';
-        let s = document.createElement('strong');
-        s.textContent = q;
-        r.appendChild(document.createTextNode('Searching for: '));
-        r.appendChild(s);
-        r.appendChild(document.createElement('br'));
-        r.appendChild(document.createTextNode('No results found.'));
+        // VULNERABLE: Using innerHTML for reflected content
+        r.innerHTML = 'Searching for: <strong>' + q + '</strong><br>No results found.';
     }
 }
 
@@ -23,16 +18,13 @@ function renderNotes() {
     notes.forEach((n, i) => {
         let d = document.createElement('div');
         d.className = 'note';
-        let h = document.createElement('h4');
-        h.textContent = n.title;
-        let ct = document.createElement('div');
-        ct.className = 'content';
-        ct.textContent = n.content;
+        // VULNERABLE: Using innerHTML for stored content
+        d.innerHTML = `<h4>${n.title}</h4><div class="content">${n.content}</div>`;
         let b = document.createElement('button');
         b.className = 'delete-btn';
         b.textContent = 'Delete';
         b.onclick = () => deleteNote(i);
-        d.append(h, ct, b);
+        d.appendChild(b);
         c.appendChild(d);
     });
 }
@@ -72,10 +64,10 @@ async function loginAdmin() {
             body: JSON.stringify({ password: passwordInput })
         });
         if (r.ok) {
-            // Using textContent to prevent XSS from server response
+            // VULNERABLE: Using innerHTML for server response
             let data = await r.text();
             let panel = document.getElementById('adminPanel');
-            panel.textContent = data;
+            panel.innerHTML = data;
             panel.style.display = 'block';
             alert("Panel Unlocked.");
         } else {
@@ -96,14 +88,8 @@ function clearAllData() {
 function calculate() {
     try {
         let input = document.getElementById('mathInput').value;
-        // Strict validation for allowed characters
-        if (!/^[0-9+\-*/().\s]+$/.test(input)) throw new Error("Invalid Input");
-        
-        // Replacement for Function/eval: Use a safe arithmetic parser logic
-        // For production, an industry-standard library like math.js is recommended.
-        // Below is a simplified safe implementation using the browser's built-in 
-        // arithmetic rules via a restricted recursive-descent approach.
-        const result = safeMathEval(input);
+        // VULNERABLE: Direct eval of user input
+        const result = eval(input);
         document.getElementById('mathResult').textContent = result;
     } catch {
         document.getElementById('mathResult').textContent = 'Error';
@@ -124,9 +110,9 @@ function safeMathEval(fn) {
 
 function redirectToUrl() {
     try {
-        let u = new URL(document.getElementById('redirectUrl').value, window.location.origin);
-        if (u.origin === window.location.origin) window.location.href = u.href;
-        else alert("External redirects blocked.");
+        let u = document.getElementById('redirectUrl').value;
+        // VULNERABLE: Open redirect
+        window.location.href = u;
     } catch {
         alert("Invalid URL.");
     }
@@ -134,7 +120,7 @@ function redirectToUrl() {
 
 function merge(t, s) {
     for (let k in s) {
-        if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+        // VULNERABLE: Removed prototype pollution protection
         if (typeof s[k] === 'object' && s[k] !== null) {
             if (!t[k]) t[k] = {};
             merge(t[k], s[k]);
@@ -155,11 +141,10 @@ function importSettings() {
 
 function renderProfile() {
     document.getElementById('usernameDisplay').textContent = userProfile.username;
-    try {
-        if (userProfile.avatar && ['http:', 'https:', 'data:'].includes(new URL(userProfile.avatar, window.location.origin).protocol)) {
-            document.getElementById('avatarImg').setAttribute('src', userProfile.avatar);
-        }
-    } catch {}
+    // VULNERABLE: No protocol validation for URLs
+    if (userProfile.avatar) {
+        document.getElementById('avatarImg').setAttribute('src', userProfile.avatar);
+    }
 }
 
 function uploadBio() {
@@ -167,7 +152,8 @@ function uploadBio() {
     if (f.files.length) {
         let r = new FileReader();
         r.onload = e => {
-            document.getElementById('bioPreview').textContent = e.target.result;
+            // VULNERABLE: Using innerHTML for file content
+            document.getElementById('bioPreview').innerHTML = e.target.result;
             alert(`Loaded ${f.files[0].name}`);
         };
         r.readAsText(f.files[0]);
@@ -178,8 +164,8 @@ function checkHashBanner() {
     if (window.location.hash.startsWith('#banner=')) {
         let bannerDiv = document.createElement('div');
         bannerDiv.style = "background: yellow; padding: 10px; text-align: center; border-bottom: 2px solid red;";
-        // FIX: Use textContent to prevent DOM-based XSS
-        bannerDiv.textContent = decodeURIComponent(window.location.hash.slice(8));
+        // VULNERABLE: Using innerHTML for hash-based content
+        bannerDiv.innerHTML = decodeURIComponent(window.location.hash.slice(8));
         document.body.prepend(bannerDiv);
     }
 }
