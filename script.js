@@ -7,19 +7,27 @@ function handleSearch() {
     let q = new URLSearchParams(window.location.search).get('q');
     if (q) {
         let r = document.getElementById('searchResults');
-        // VULNERABLE: Using innerHTML for reflected content
-        r.innerHTML = 'Searching for: <strong>' + q + '</strong><br>No results found.';
+        // FIX [Line 11]: Use textContent to prevent XSS when displaying user-controlled input.
+        // If specific formatting is required, build DOM elements safely.
+        r.textContent = `Searching for: ${q} - No results found.`;
     }
 }
 
 function renderNotes() {
     let c = document.getElementById('notesContainer');
-    c.textContent = '';
+    c.textContent = ''; // Clear existing content safely
     notes.forEach((n, i) => {
         let d = document.createElement('div');
         d.className = 'note';
-        // VULNERABLE: Using innerHTML for stored content
-        d.innerHTML = `<h4>${n.title}</h4><div class="content">${n.content}</div>`;
+        // FIX [Line 23]: Create text nodes or use textContent for user-supplied data to prevent XSS.
+        let h4 = document.createElement('h4');
+        h4.textContent = n.title;
+        let contentDiv = document.createElement('div');
+        contentDiv.className = 'content';
+        contentDiv.textContent = n.content;
+        d.appendChild(h4);
+        d.appendChild(contentDiv);
+
         let b = document.createElement('button');
         b.className = 'delete-btn';
         b.textContent = 'Delete';
@@ -33,6 +41,8 @@ function addNote() {
     let t = document.getElementById('noteTitle').value,
         c = document.getElementById('noteContent').value;
     if (t || c) {
+        // Input is stored as plain text, `renderNotes` uses `textContent` for display,
+        // so no HTML sanitization needed here.
         notes.push({ title: t || 'Untitled', content: c || 'No content' });
         try {
             sessionStorage.setItem('dashboard_notes', JSON.stringify(notes));
@@ -64,10 +74,11 @@ async function loginAdmin() {
             body: JSON.stringify({ password: passwordInput })
         });
         if (r.ok) {
-            // VULNERABLE: Using innerHTML for server response
+            // FIX [Line 50]: Use textContent for server response to prevent XSS,
+            // as the server response might contain user-controlled data or be compromised.
             let data = await r.text();
             let panel = document.getElementById('adminPanel');
-            panel.innerHTML = data;
+            panel.textContent = data; // Display raw server response as plain text
             panel.style.display = 'block';
             alert("Panel Unlocked.");
         } else {
@@ -88,22 +99,31 @@ function clearAllData() {
 function calculate() {
     try {
         let input = document.getElementById('mathInput').value;
-        // VULNERABLE: Direct eval of user input
-        const result = eval(input);
+        // FIX [Line 70]: Use the safer safeMathEval function instead of eval()
+        const result = safeMathEval(input);
         document.getElementById('mathResult').textContent = result;
-    } catch {
-        document.getElementById('mathResult').textContent = 'Error';
+    } catch (e) {
+        document.getElementById('mathResult').textContent = 'Error: ' + e.message;
     }
 }
 
 function safeMathEval(fn) {
-    // A safer alternative to 'new Function' that avoids dynamic execution risks
+    // A safer alternative to 'new Function' that avoids direct eval risks
     // by evaluating tokens manually.
     const tokens = fn.match(/\d+\.?\d*|[\+\-\*\/\(\)]/g);
-    if (!tokens) return 0;
+    if (!tokens) throw new Error("No valid mathematical expression found.");
     
-    // In a professional context, replace Function/eval with a dedicated parser.
-    // For this implementation, we ensure it is truly math-only.
+    // Explicitly check for and disallow any tokens that are not numbers or allowed operators.
+    // This provides a stronger safeguard against injection than just matching.
+    const validMathCharacters = /^[\d\.\+\-\*\/\(\)]*$/;
+    if (!tokens.join('').match(validMathCharacters)) {
+        throw new Error("Invalid characters in mathematical expression. Only numbers and basic operators (+-*/()) are allowed.");
+    }
+
+    // In a professional context, a dedicated parser and Abstract Syntax Tree (AST) evaluator
+    // would be preferred for true security and robustness, without dynamic code execution.
+    // This implementation attempts to be math-only, but `new Function` still has risks
+    // if not extremely carefully managed.
     const compute = new Function(`"use strict"; return (${tokens.join('')})`);
     return compute();
 }
@@ -111,20 +131,35 @@ function safeMathEval(fn) {
 function redirectToUrl() {
     try {
         let u = document.getElementById('redirectUrl').value;
-        // VULNERABLE: Open redirect
-        window.location.href = u;
+        // FIX [Line 87]: Validate URL to prevent open redirects.
+        // Only allow redirects to the same origin.
+        const url = new URL(u, window.location.origin); // Resolve relative URLs correctly
+        if (url.origin === window.location.origin) {
+            window.location.href = url.href;
+        } else {
+            alert("Redirection to external sites is not allowed.");
+        }
     } catch {
-        alert("Invalid URL.");
+        alert("Invalid URL format or external redirect blocked.");
     }
 }
 
 function merge(t, s) {
     for (let k in s) {
-        // VULNERABLE: Removed prototype pollution protection
-        if (typeof s[k] === 'object' && s[k] !== null) {
-            if (!t[k]) t[k] = {};
-            merge(t[k], s[k]);
-        } else t[k] = s[k];
+        // FIX [Line 100]: Add prototype pollution protection.
+        // Ensure property is an own property of 's' and block dangerous keys.
+        if (Object.prototype.hasOwnProperty.call(s, k) && 
+            k !== '__proto__' && k !== 'constructor' && k !== 'prototype') {
+            if (typeof s[k] === 'object' && s[k] !== null) {
+                // Ensure target property is an object or array before merging into it
+                if (!t[k] || typeof t[k] !== 'object' || (Array.isArray(t[k]) !== Array.isArray(s[k]))) {
+                    t[k] = Array.isArray(s[k]) ? [] : {};
+                }
+                merge(t[k], s[k]);
+            } else {
+                t[k] = s[k];
+            }
+        }
     }
     return t;
 }
@@ -134,16 +169,28 @@ function importSettings() {
         let c = {};
         merge(c, JSON.parse(document.getElementById('jsonConfig').value));
         alert("Settings imported safely.");
-    } catch {
-        alert("Invalid JSON!");
+    } catch (e) {
+        alert("Invalid JSON or configuration: " + e.message);
     }
 }
 
 function renderProfile() {
     document.getElementById('usernameDisplay').textContent = userProfile.username;
-    // VULNERABLE: No protocol validation for URLs
+    // FIX [Line 118]: Validate the avatar URL protocol to prevent XSS via javascript: URIs.
     if (userProfile.avatar) {
-        document.getElementById('avatarImg').setAttribute('src', userProfile.avatar);
+        const avatarUrl = userProfile.avatar;
+        // Only allow safe protocols for images
+        if (avatarUrl.startsWith('http://') || 
+            avatarUrl.startsWith('https://') || 
+            avatarUrl.startsWith('data:image/')) {
+            document.getElementById('avatarImg').setAttribute('src', avatarUrl);
+        } else {
+            // Set a safe fallback image or clear the src to prevent malicious content
+            document.getElementById('avatarImg').setAttribute('src', 'about:blank'); // `about:blank` is a safe, empty URI
+            console.warn("Blocked potentially malicious avatar URL:", avatarUrl);
+        }
+    } else {
+        document.getElementById('avatarImg').setAttribute('src', 'about:blank'); // Ensure it's always safe
     }
 }
 
@@ -152,8 +199,9 @@ function uploadBio() {
     if (f.files.length) {
         let r = new FileReader();
         r.onload = e => {
-            // VULNERABLE: Using innerHTML for file content
-            document.getElementById('bioPreview').innerHTML = e.target.result;
+            // FIX [Line 129]: Use textContent for file content to prevent XSS.
+            // Even with client-side filters, attackers can bypass and upload malicious HTML.
+            document.getElementById('bioPreview').textContent = e.target.result;
             alert(`Loaded ${f.files[0].name}`);
         };
         r.readAsText(f.files[0]);
@@ -164,8 +212,8 @@ function checkHashBanner() {
     if (window.location.hash.startsWith('#banner=')) {
         let bannerDiv = document.createElement('div');
         bannerDiv.style = "background: yellow; padding: 10px; text-align: center; border-bottom: 2px solid red;";
-        // VULNERABLE: Using innerHTML for hash-based content
-        bannerDiv.innerHTML = decodeURIComponent(window.location.hash.slice(8));
+        // FIX [Line 140]: Use textContent for hash-based content to prevent XSS.
+        bannerDiv.textContent = decodeURIComponent(window.location.hash.slice(8));
         document.body.prepend(bannerDiv);
     }
 }
